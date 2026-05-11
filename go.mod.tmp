@@ -1,0 +1,6 @@
+require (
+	github.com/72nd/escposimg v0.0.0
+	github.com/urfave/cli/v3 v3.0.0-alpha9
+)
+
+replace github.com/72nd/escposimg => ../escposimg
