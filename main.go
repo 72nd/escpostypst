@@ -13,7 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const appVersion = "0.1.0"
+const appVersion = "0.1.1"
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -41,6 +41,7 @@ func main() {
 			&cli.StringFlag{Name: "debug-image", Value: "debug_output.png", Usage: "Path to save debug image"},
 			&cli.StringFlag{Name: "debug-text", Usage: "Optional debug text to print before image"},
 			&cli.BoolFlag{Name: "no-cut", Usage: "Do not send a paper cut after single-page jobs (multi-page documents still cut between pages)"},
+			&cli.BoolFlag{Name: "reverse-pages", Usage: "Print pages in reverse order (last PDF page first)"},
 			&cli.StringFlag{Name: "output", Value: "network", Usage: "Output method (stdout, network, file)"},
 			&cli.StringFlag{Name: "host", Usage: "Printer hostname or IP for network output"},
 			&cli.IntFlag{Name: "port", Value: 9100, Usage: "TCP port for network output (common raw/JetDirect default: 9100)"},
@@ -94,7 +95,7 @@ func main() {
 			}
 
 			cutSinglePage := !cmd.Bool("no-cut")
-			return runPipeline(ctx, typArg, copies, cutSinglePage, imgCfg,
+			return runPipeline(ctx, typArg, copies, cutSinglePage, !cmd.Bool("reverse-pages"), imgCfg,
 				output, networkAddr, cmd.String("file-path"))
 		},
 	}

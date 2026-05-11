@@ -8,8 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/72nd/escposimg"
 )
@@ -41,7 +43,42 @@ func rasterizePDF(ctx context.Context, pdfPath, pbmOutPattern string, dpi int) e
 	return nil
 }
 
-func runPipeline(ctx context.Context, typPath string, copies int, cutSinglePage bool, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath string) error {
+// pageNumberFromPBMPath returns the Ghostscript page index encoded in names like "page-00001.pbm".
+// Sorting by this integer preserves PDF page order regardless of zero-padding width.
+func pageNumberFromPBMPath(path string) (n int, ok bool) {
+	base := filepath.Base(path)
+	const prefix = "page-"
+	const suffix = ".pbm"
+	if !strings.HasPrefix(base, prefix) || !strings.HasSuffix(base, suffix) {
+		return 0, false
+	}
+	mid := base[len(prefix) : len(base)-len(suffix)]
+	if mid == "" {
+		return 0, false
+	}
+	v, err := strconv.Atoi(mid)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func sortPBMPathsByPageNumber(paths []string) {
+	sort.SliceStable(paths, func(i, j int) bool {
+		ni, okI := pageNumberFromPBMPath(paths[i])
+		nj, okJ := pageNumberFromPBMPath(paths[j])
+		switch {
+		case okI && okJ && ni != nj:
+			return ni < nj
+		case okI != okJ:
+			return okI // known filenames before unexpected matches
+		default:
+			return paths[i] < paths[j]
+		}
+	})
+}
+
+func runPipeline(ctx context.Context, typPath string, copies int, cutSinglePage bool, reversePages bool, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath string) error {
 	if copies < 1 {
 		return fmt.Errorf("copies must be at least 1")
 	}
@@ -86,7 +123,10 @@ func runPipeline(ctx context.Context, typPath string, copies int, cutSinglePage 
 	if len(pages) == 0 {
 		return fmt.Errorf("ghostscript produced no PBM pages (check PDF and gs install)")
 	}
-	sort.Strings(pages)
+	sortPBMPathsByPageNumber(pages)
+	if reversePages {
+		slices.Reverse(pages)
+	}
 
 	cutAfterEachPage := len(pages) > 1 || cutSinglePage
 
