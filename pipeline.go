@@ -78,7 +78,7 @@ func sortPBMPathsByPageNumber(paths []string) {
 	})
 }
 
-func runPipeline(ctx context.Context, typPath string, copies int, cutSinglePage bool, reversePages bool, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath string) error {
+func runPipeline(ctx context.Context, typPath string, typstRoot string, copies int, cutSinglePage bool, reversePages bool, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath string) error {
 	if copies < 1 {
 		return fmt.Errorf("copies must be at least 1")
 	}
@@ -88,6 +88,10 @@ func runPipeline(ctx context.Context, typPath string, copies int, cutSinglePage 
 		return fmt.Errorf("resolve typ path: %w", err)
 	}
 	baseDir := filepath.Dir(absTyp)
+	rootDir := baseDir
+	if typstRoot != "" {
+		rootDir = typstRoot
+	}
 
 	workDir, err := os.MkdirTemp(baseDir, ".escpostypst-*")
 	if err != nil {
@@ -100,8 +104,8 @@ func runPipeline(ctx context.Context, typPath string, copies int, cutSinglePage 
 	}()
 
 	pdfPath := filepath.Join(workDir, "document.pdf")
-	slog.Debug("compiling Typst", "root", baseDir, "input", absTyp, "pdf", pdfPath)
-	if err := compileTypst(ctx, baseDir, absTyp, pdfPath); err != nil {
+	slog.Debug("compiling Typst", "root", rootDir, "input", absTyp, "pdf", pdfPath)
+	if err := compileTypst(ctx, rootDir, absTyp, pdfPath); err != nil {
 		return err
 	}
 

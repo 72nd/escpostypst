@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -36,6 +37,7 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "paper-width", Value: 72, Usage: "Paper width in millimeters"},
 			&cli.IntFlag{Name: "dpi", Value: 203, Usage: "Printer DPI"},
+			&cli.StringFlag{Name: "root", Usage: "Typst project root (passed to typst compile --root); default is the directory of the input file"},
 			&cli.StringFlag{Name: "print-mode", Value: "raster", Usage: "ESC/POS print mode (raster, graphics, column)"},
 			&cli.BoolFlag{Name: "debug-output", Usage: "Save processed image for debugging"},
 			&cli.StringFlag{Name: "debug-image", Value: "debug_output.png", Usage: "Path to save debug image"},
@@ -88,6 +90,22 @@ func main() {
 				return fmt.Errorf("typ path is a directory: %s", typArg)
 			}
 
+			var typstRoot string
+			if r := strings.TrimSpace(cmd.String("root")); r != "" {
+				absRoot, err := filepath.Abs(r)
+				if err != nil {
+					return cli.Exit(fmt.Sprintf("Error: --root: %v\n", err), 1)
+				}
+				stRoot, err := os.Stat(absRoot)
+				if err != nil {
+					return cli.Exit(fmt.Sprintf("Error: --root: %v\n", err), 1)
+				}
+				if !stRoot.IsDir() {
+					return cli.Exit(fmt.Sprintf("Error: --root is not a directory: %s\n", absRoot), 1)
+				}
+				typstRoot = absRoot
+			}
+
 			output := cmd.String("output")
 			networkAddr, err := resolveNetworkAddress(output, cmd.String("host"), cmd.Int("port"))
 			if err != nil {
@@ -95,7 +113,7 @@ func main() {
 			}
 
 			cutSinglePage := !cmd.Bool("no-cut")
-			return runPipeline(ctx, typArg, copies, cutSinglePage, !cmd.Bool("reverse-pages"), imgCfg,
+			return runPipeline(ctx, typArg, typstRoot, copies, cutSinglePage, !cmd.Bool("reverse-pages"), imgCfg,
 				output, networkAddr, cmd.String("file-path"))
 		},
 	}
