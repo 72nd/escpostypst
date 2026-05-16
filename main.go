@@ -14,7 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const appVersion = "0.1.1"
+const appVersion = "0.1.3"
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -50,6 +50,7 @@ func main() {
 			&cli.StringFlag{Name: "file-path", Usage: "File path for file output"},
 			&cli.BoolFlag{Name: "verbose", Usage: "Enable verbose logging"},
 			&cli.IntFlag{Name: "copies", Aliases: []string{"n"}, Value: 1, Usage: "Number of copies to print"},
+			&cli.StringFlag{Name: "pages", Usage: "Pages to print, e.g. '3', '2-4', '1,3,5', '2-' (default: all)"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Bool("verbose") {
@@ -113,8 +114,8 @@ func main() {
 			}
 
 			cutSinglePage := !cmd.Bool("no-cut")
-			return runPipeline(ctx, typArg, typstRoot, copies, cutSinglePage, !cmd.Bool("reverse-pages"), imgCfg,
-				output, networkAddr, cmd.String("file-path"))
+			return runPipeline(ctx, typArg, typstRoot, copies, cutSinglePage, !cmd.Bool("reverse-pages"), cmd.String("pages"),
+				imgCfg, output, networkAddr, cmd.String("file-path"))
 		},
 	}
 
