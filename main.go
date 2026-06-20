@@ -44,10 +44,11 @@ func main() {
 			&cli.StringFlag{Name: "debug-text", Usage: "Optional debug text to print before image"},
 			&cli.BoolFlag{Name: "no-cut", Usage: "Do not send a paper cut after single-page jobs (multi-page documents still cut between pages)"},
 			&cli.BoolFlag{Name: "reverse-pages", Usage: "Print pages in reverse order (last PDF page first)"},
-			&cli.StringFlag{Name: "output", Value: "network", Usage: "Output method (stdout, network, file)"},
+			&cli.StringFlag{Name: "output", Value: "network", Usage: "Output method (stdout, network, file, usb)"},
 			&cli.StringFlag{Name: "host", Usage: "Printer hostname or IP for network output"},
 			&cli.IntFlag{Name: "port", Value: 9100, Usage: "TCP port for network output (common raw/JetDirect default: 9100)"},
 			&cli.StringFlag{Name: "file-path", Usage: "File path for file output"},
+			&cli.StringFlag{Name: "usb-device", Value: "/dev/usb/lp0", Usage: "Path to USB printer device for usb output"},
 			&cli.BoolFlag{Name: "verbose", Usage: "Enable verbose logging"},
 			&cli.IntFlag{Name: "copies", Aliases: []string{"n"}, Value: 1, Usage: "Number of copies to print"},
 			&cli.StringFlag{Name: "pages", Usage: "Pages to print, e.g. '3', '2-4', '1,3,5', '2-' (default: all)"},
@@ -115,7 +116,7 @@ func main() {
 
 			cutSinglePage := !cmd.Bool("no-cut")
 			return runPipeline(ctx, typArg, typstRoot, copies, cutSinglePage, !cmd.Bool("reverse-pages"), cmd.String("pages"),
-				imgCfg, output, networkAddr, cmd.String("file-path"))
+				imgCfg, output, networkAddr, cmd.String("file-path"), cmd.String("usb-device"))
 		},
 	}
 
@@ -152,7 +153,7 @@ func parsePrintMode(mode string) (escposimg.PrintMode, error) {
 	}
 }
 
-func createOutputMethod(method, networkAddr, filePath string) (escposimg.OutputMethod, error) {
+func createOutputMethod(method, networkAddr, filePath, usbDevice string) (escposimg.OutputMethod, error) {
 	switch strings.ToLower(method) {
 	case "stdout":
 		return escposimg.NewStdoutOutput(), nil
@@ -166,6 +167,8 @@ func createOutputMethod(method, networkAddr, filePath string) (escposimg.OutputM
 			return nil, fmt.Errorf("file path is required for file output")
 		}
 		return escposimg.NewFileOutput(filePath)
+	case "usb":
+		return escposimg.NewUSBOutput(usbDevice)
 	default:
 		return nil, fmt.Errorf("unknown output method: %s", method)
 	}

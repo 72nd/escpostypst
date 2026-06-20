@@ -191,7 +191,7 @@ func sortPBMPathsByPageNumber(paths []string) {
 	})
 }
 
-func runPipeline(ctx context.Context, typPath string, typstRoot string, copies int, cutSinglePage bool, reversePages bool, pagesSpec string, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath string) error {
+func runPipeline(ctx context.Context, typPath string, typstRoot string, copies int, cutSinglePage bool, reversePages bool, pagesSpec string, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath, usbDevice string) error {
 	if copies < 1 {
 		return fmt.Errorf("copies must be at least 1")
 	}
@@ -264,7 +264,7 @@ func runPipeline(ctx context.Context, typPath string, typstRoot string, copies i
 			cfg := *imgCfg
 			cfg.CutPaper = cutAfterEachPage
 
-			output, outErr := createOutputMethod(outputMethod, networkAddr, filePath)
+			output, outErr := createOutputMethod(outputMethod, networkAddr, filePath, usbDevice)
 			if outErr != nil {
 				return outErr
 			}

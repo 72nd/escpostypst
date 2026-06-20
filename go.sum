@@ -1,3 +1,5 @@
+github.com/72nd/escposimg v0.2.3 h1:Wia9IOj/Ujsv6GQB8EENb8yL5caKFSupC4HErJ0C3S0=
+github.com/72nd/escposimg v0.2.3/go.mod h1:JUIfb0KiQBQn1e57HFF5jI4U023Tf3RyKzflKAon5h0=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6Oo2LfFZAehjjQMERAvZLEDnQ=
