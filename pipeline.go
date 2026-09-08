@@ -191,14 +191,10 @@ func sortPBMPathsByPageNumber(paths []string) {
 	})
 }
 
-func runPipeline(ctx context.Context, typPath string, typstRoot string, copies int, cutSinglePage bool, reversePages bool, pagesSpec string, imgCfg *escposimg.Config, outputMethod, networkAddr, filePath, usbDevice string) error {
-	if copies < 1 {
-		return fmt.Errorf("copies must be at least 1")
-	}
-
+func preprocessPipeline(ctx context.Context, typPath string, typstRoot string, reversePages bool, pagesSpec string, dpi int) (pages []string, cleanup func(), err error) {
 	absTyp, err := filepath.Abs(typPath)
 	if err != nil {
-		return fmt.Errorf("resolve typ path: %w", err)
+		return nil, nil, fmt.Errorf("resolve typ path: %w", err)
 	}
 	baseDir := filepath.Dir(absTyp)
 	rootDir := baseDir
@@ -208,37 +204,42 @@ func runPipeline(ctx context.Context, typPath string, typstRoot string, copies i
 
 	workDir, err := os.MkdirTemp(baseDir, ".escpostypst-*")
 	if err != nil {
-		return fmt.Errorf("create work dir: %w", err)
+		return nil, nil, fmt.Errorf("create work dir: %w", err)
 	}
-	defer func() {
+	cleanup = func() {
 		if rmErr := os.RemoveAll(workDir); rmErr != nil {
 			slog.Warn("failed to remove work dir", "path", workDir, "error", rmErr)
 		}
-	}()
+	}
 
 	pdfPath := filepath.Join(workDir, "document.pdf")
 	slog.Debug("compiling Typst", "root", rootDir, "input", absTyp, "pdf", pdfPath)
 	if err := compileTypst(ctx, rootDir, absTyp, pdfPath); err != nil {
-		return err
+		cleanup()
+		return nil, nil, err
 	}
 
 	pbmDir := filepath.Join(workDir, "pages")
 	if err := os.MkdirAll(pbmDir, 0o755); err != nil {
-		return fmt.Errorf("create pages dir: %w", err)
+		cleanup()
+		return nil, nil, fmt.Errorf("create pages dir: %w", err)
 	}
 
 	outPattern := filepath.Join(pbmDir, "page-%05d.pbm")
-	slog.Debug("rasterizing PDF", "dpi", imgCfg.DPI, "pattern", outPattern)
-	if err := rasterizePDF(ctx, pdfPath, outPattern, imgCfg.DPI); err != nil {
-		return err
+	slog.Debug("rasterizing PDF", "dpi", dpi, "pattern", outPattern)
+	if err := rasterizePDF(ctx, pdfPath, outPattern, dpi); err != nil {
+		cleanup()
+		return nil, nil, err
 	}
 
-	pages, err := filepath.Glob(filepath.Join(pbmDir, "page-*.pbm"))
+	pages, err = filepath.Glob(filepath.Join(pbmDir, "page-*.pbm"))
 	if err != nil {
-		return fmt.Errorf("list PBM pages: %w", err)
+		cleanup()
+		return nil, nil, fmt.Errorf("list PBM pages: %w", err)
 	}
 	if len(pages) == 0 {
-		return fmt.Errorf("ghostscript produced no PBM pages (check PDF and gs install)")
+		cleanup()
+		return nil, nil, fmt.Errorf("ghostscript produced no PBM pages (check PDF and gs install)")
 	}
 	sortPBMPathsByPageNumber(pages)
 	if reversePages {
@@ -248,23 +249,39 @@ func runPipeline(ctx context.Context, typPath string, typstRoot string, copies i
 	total := len(pages)
 	selected, err := parsePageSelection(pagesSpec, total)
 	if err != nil {
-		return err
+		cleanup()
+		return nil, nil, err
 	}
 	pages, err = filterPagesBySelection(pages, selected)
 	if err != nil {
-		return err
+		cleanup()
+		return nil, nil, err
 	}
 	slog.Debug("page selection applied", "total_pdf_pages", total, "printing", len(pages), "spec", pagesSpec)
+	return pages, cleanup, nil
+}
+
+func printPages(ctx context.Context, pages []string, copies int, cutSinglePage bool, imgCfg *escposimg.Config, dest outputConfig) error {
+	if copies < 1 {
+		return fmt.Errorf("copies must be at least 1")
+	}
+	if len(pages) == 0 {
+		return fmt.Errorf("no pages to print")
+	}
 
 	cutAfterEachPage := len(pages) > 1 || cutSinglePage
 
 	for copyIdx := 0; copyIdx < copies; copyIdx++ {
 		slog.Debug("printing copy", "copy", copyIdx+1, "of", copies, "pages", len(pages))
 		for _, pagePath := range pages {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			cfg := *imgCfg
 			cfg.CutPaper = cutAfterEachPage
 
-			output, outErr := createOutputMethod(outputMethod, networkAddr, filePath, usbDevice)
+			output, outErr := dest.createOutputMethod()
 			if outErr != nil {
 				return outErr
 			}
@@ -275,6 +292,15 @@ func runPipeline(ctx context.Context, typPath string, typstRoot string, copies i
 		}
 	}
 
-	slog.Info("Typst document printed successfully", "pages", len(pages), "copies", copies)
+	slog.Info("document printed successfully", "pages", len(pages), "copies", copies)
 	return nil
+}
+
+func runPipeline(ctx context.Context, typPath string, typstRoot string, copies int, cutSinglePage bool, reversePages bool, pagesSpec string, imgCfg *escposimg.Config, dest outputConfig) error {
+	pages, cleanup, err := preprocessPipeline(ctx, typPath, typstRoot, reversePages, pagesSpec, imgCfg.DPI)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	return printPages(ctx, pages, copies, cutSinglePage, imgCfg, dest)
 }
